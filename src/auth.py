@@ -1,55 +1,68 @@
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2 import service_account
 from pathlib import Path
 import logging
 import glob
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def start():
-    # logging
-    logging.basicConfig(level=logging.INFO)
-
-    SCOPES = ['']
-    SERVICE_ACCOUNT_FILE = ''
-    FOLDER_ID = ''
-
+    """
+    Upload file-file sesuai pola ke Google Drive menggunakan service account.
+    """
     
-    creds = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE,
-        scopes=SCOPES
-    )
-    
-    service = build("drive", "v3", credentials=creds, cache_discovery=False)
+    SCOPES = ['https://www.googleapis.com/auth/drive.file'] 
+    SERVICE_ACCOUNT_FILE = 'path/to/your-service-account-key.json'
+    FOLDER_ID = 'your-google-drive-folder-id'
 
-    # full paths
     paths = [
-        ""
+        "D:/backup/*.zip",
+        "D:/backup/*.tar.gz",
     ]
-    if paths:
-        for uploading in range(len(paths)):
-            path = glob.glob(paths[uploading])
 
-            for i in path:
-                fullpath = Path(i)
+    if not paths:
+        logger.warning("Tidak ada pola file yang ditentukan. Backup dibatalkan.")
+        return
+
+    try:
+        creds = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=SCOPES
+        )
+        service = build("drive", "v3", credentials=creds, cache_discovery=False)
+
+        for pattern in paths:
+            matched_files = glob.glob(pattern)
+            if not matched_files:
+                logger.info(f"Tidak ada file yang cocok dengan pola: {pattern}")
+                continue
+
+            for file_path in matched_files:
+                fullpath = Path(file_path)
+                if not fullpath.is_file():
+                    logger.warning(f"Bukan file valid: {fullpath}")
+                    continue
 
                 file_metadata = {
                     'name': fullpath.name,
                     'parents': [FOLDER_ID]
                 }
-                file = MediaFileUpload(fullpath, resumable=True)
+                media = MediaFileUpload(str(fullpath), resumable=True)
 
-                res = service.files().create(
+                request = service.files().create(
                     body=file_metadata,
-                    media_body=file,
+                    media_body=media,
                     fields='id'
-                ).execute()
+                )
+                response = request.execute()
 
-                if res:
-                    logging.info(f"{fullpath.name}")
-                    print("file uploaded")
+                if response and 'id' in response:
+                    logger.info(f"Berhasil upload: {fullpath.name} (ID: {response['id']})")
                 else:
-                    print("file failed to upload")
+                    logger.error(f"Gagal upload: {fullpath.name}")
 
-                print(file)
+    except Exception as e:
+        logger.error(f"Error saat upload: {e}")
+        raise
