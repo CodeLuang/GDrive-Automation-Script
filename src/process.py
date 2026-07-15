@@ -1,36 +1,37 @@
 import datetime
 import logging
-from colorama import Fore
 from time import sleep
+from auth import start as backup_start 
 
-now = datetime.datetime.now()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-dayNow = now.strftime("%Y-%m-%d")
-SetRunDay = 10
-dayS = int(dayNow[8:]) + SetRunDay
+def main():
+    SET_RUN_DAY = 10 
 
-# logging config
-logging.basicConfig(level=logging.DEBUG)
-
-while True:
-    sleep(1)
-
-    if SetRunDay != 0:
-        dp = dayNow[:8] + f"{dayS}" 
-        msg = f"run the script at {dp}"
-        if dp == dayNow:
-            if msg != "":
-                logging.info(msg)
-            else:
-                pass
+    if SET_RUN_DAY <= 0:
+        raise ValueError("SET_RUN_DAY harus lebih besar dari 0")
         
-            # run function
-            
+    today = datetime.date.today()
+    target_date = today + datetime.timedelta(days=SET_RUN_DAY)
+    logger.info(f"Backup dijadwalkan pada {target_date}. Menunggu...")
 
+    while True:
+        now = datetime.date.today()
+        if now >= target_date:
+            logger.info(f"Hari ini {now}, menjalankan backup...")
+            try:
+                backup_start() 
+                logger.info("Backup selesai.")
+            except Exception as e:
+                logger.error(f"Backup gagal: {e}")
+            break 
         else:
-            logging.info(f"the script will be running at {dp}")
-            sleep(1)
-            logging.info("why dont you take a break and drink a coffee")
+            
+            remaining = (target_date - now).days
+            logger.info(f"Backup akan dijalankan pada {target_date}. "
+                        f"Sisa {remaining} hari. Ngopi dulu, bro!")
+            sleep(3600) 
 
-    else:
-        raise("please set SetRunDay variable")
+if __name__ == "__main__":
+    main()
